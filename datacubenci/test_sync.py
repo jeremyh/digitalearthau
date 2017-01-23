@@ -14,7 +14,12 @@ class MemoryDatasetPathIndex(sync.DatasetPathIndex):
         self._records = MultiDict()
 
     def iter_all_uris(self, product: str) -> Iterable[str]:
-        return self._records.keys()
+        for uri_, ids in self._records.iteritems():
+            for id_ in ids:
+                yield uri_, id_
+
+    def has_dataset(self, dataset_id: uuid.UUID) -> bool:
+        return False
 
     def add_location(self, dataset_id: uuid.UUID, uri: str) -> bool:
         ids = self._records.getlist(uri)

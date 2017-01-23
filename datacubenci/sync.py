@@ -2,7 +2,7 @@ import dawg
 import uuid
 from itertools import chain
 from pathlib import Path
-from typing import Iterable, List, Mapping, Tuple
+from typing import Iterable, List, Mapping, Tuple, Union
 
 import structlog
 from attr import attributes, attrib
@@ -20,7 +20,7 @@ class DatasetPathIndex:
     def __init__(self):
         super().__init__()
 
-    def iter_all_uris(self, product: str) -> Iterable[str]:
+    def iter_all_uris(self, product: str) -> Iterable[Union[uuid.UUID, str]]:
         raise NotImplementedError
 
     def get_dataset_ids_for_uri(self, uri: str) -> List[uuid.UUID]:
@@ -37,8 +37,8 @@ class DatasetPathIndex:
 
 
 class DatasetLite:
-    def __init__(self, id):
-        self.id = id
+    def __init__(self, id_):
+        self.id = id_
 
 
 class AgdcDatasetPathIndex(DatasetPathIndex):
@@ -47,8 +47,8 @@ class AgdcDatasetPathIndex(DatasetPathIndex):
         self._index = index
 
     def iter_all_uris(self, product: str) -> Iterable[str]:
-        for uri, in self._index.datasets.search_returning(['uri'], product=product):
-            yield str(uri)
+        for uri, id_ in self._index.datasets.search_returning(['uri', 'id'], product=product):
+            yield str(uri), id_
 
     @classmethod
     def connect(cls) -> 'AgdcDatasetPathIndex':
@@ -86,20 +86,23 @@ def iter_product_pathsets(product_locations: Mapping[str, Path],
 def _build_pathset(path_search_root: Path,
                    product: str,
                    path_index: DatasetPathIndex,
-                   cache_path: Path = None) -> dawg.CompletionDAWG:
+                   cache_path: Path=None) -> dawg.CompletionDAWG:
     log = _LOG.bind(product=product)
 
     locations_cache = cache_path.joinpath(product + '-locations.dawg') if cache_path else None
     if locations_cache and locations_cache.exists():
-        path_set = dawg.CompletionDAWG()
+        path_set = dawg.RecordDAWG()
         log.debug("paths.trie.cache.load", file=locations_cache)
         path_set.load(str(locations_cache))
     else:
         log.info("paths.trie.build")
-        path_set = dawg.CompletionDAWG(
+        path_set = dawg.RecordDAWG(
+            '16s',
             chain(
-                path_index.iter_all_uris(product),
-                (path.absolute().as_uri() for path in path_search_root.rglob("ga-metadata.yaml"))
+                ((uri, id_.bytes)
+                 for uri, id_ in path_index.iter_all_uris(product)),
+                ((path.absolute().as_uri(), None)
+                 for path in path_search_root.rglob("ga-metadata.yaml"))
             )
         )
         log.info("paths.trie.done")
@@ -129,12 +132,12 @@ class DatasetNotIndexed(Mismatch):
     pass
 
 
-def compare_index_and_files(all_file_uris: Iterable[str], index: DatasetPathIndex):
-    for uri in all_file_uris:
+def compare_index_and_files(all_file_uris: Iterable[Tuple[str, List[uuid.UUID]]], index: DatasetPathIndex):
+    for uri, indexed_dataset_ids in all_file_uris:
         path = uri_to_local_path(uri)
         log = _LOG.bind(path=path)
 
-        indexed_dataset_ids = index.get_dataset_ids_for_uri(uri)
+        # indexed_dataset_ids = index.get_dataset_ids_for_uri(uri)
         file_ids = paths.get_path_dataset_ids(path) if path.exists() else []
         log.info("dataset_ids", indexed_dataset_ids=indexed_dataset_ids, file_ids=file_ids)
 
@@ -162,7 +165,8 @@ def main():
     with AgdcDatasetPathIndex.connect() as path_index:
         for product, pathset in iter_product_pathsets(products, path_index, cache_path=cache):
             compare_index_and_files(
-                pathset.iterkeys('file://'),
+                ((uri, [uuid.UUID(id_bytes) for id_bytes in ids_bytes])
+                 for uri, ids_bytes in pathset.iterkeys('file://')),
                 path_index
             )
 
