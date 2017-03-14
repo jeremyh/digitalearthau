@@ -65,7 +65,7 @@ def write_files(file_dict):
     """
     Convenience method for writing a tree of files to a temporary directory.
 
-    (primarily indended for use in tests)
+    (primarily indented for use in tests)
 
     Dict format is "filename": "text content"
 

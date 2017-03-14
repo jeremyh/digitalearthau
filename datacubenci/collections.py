@@ -57,16 +57,19 @@ NCI_COLLECTIONS.update({
         query={'product': ['ls8_level1_scene', 'ls8_level1_oli_scene']},
         base_path=Path('/g/data/v10/reprocess/ls8/level1'),
         offset_pattern="[0-9][0-9][0-9][0-9]/[0-9][0-9]/LS*/ga-metadata.yaml",
+        expected_parents=('ls8_satellite_telemetry_data',)
     ),
     'ls7_level1_scene': SceneCollection(
         query={'product': 'ls7_level1_scene'},
         base_path=Path('/g/data/v10/reprocess/ls7/level1'),
         offset_pattern="[0.-9][0-9][0-9][0-9]/[0-9][0-9]/LS*/ga-metadata.yaml",
+        expected_parents=('ls7_satellite_telemetry_data',),
     ),
     'ls5_level1_scene': SceneCollection(
         query={'product': 'ls5_level1_scene'},
         base_path=Path('/g/data/v10/reprocess/ls5/level1'),
         offset_pattern="[0-9][0-9][0-9][0-9]/[0-9][0-9]/LS*/ga-metadata.yaml",
+        expected_parents=('ls5_satellite_telemetry_data',),
     ),
 })
 
