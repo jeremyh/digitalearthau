@@ -36,7 +36,7 @@ _LOG = structlog.get_logger()
 @click.argument('paths', type=str, nargs=-1)
 @ui.pass_index('mdss-archival')
 def main(index, project, dry_run, paths):
-    uiutil.init_logging()
+    uiutil.init_log_storage()
 
     # TODO: @ui.executor_cli_options
     archive_all(

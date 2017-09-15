@@ -4,8 +4,12 @@ import pathlib
 import uuid
 from pathlib import Path
 
+import os
 import structlog
 import sys
+import logging
+
+_LOG = structlog.get_logger()
 
 
 class CleanConsoleRenderer(structlog.dev.ConsoleRenderer):
@@ -15,20 +19,48 @@ class CleanConsoleRenderer(structlog.dev.ConsoleRenderer):
         self._level_to_color['debug'] = structlog.dev.DIM
 
 
-def init_logging():
-    # Direct structlog into standard logging.
+class StructLogHandler(logging.Handler):
+    def emit(self, record: logging.LogRecord):
+        _LOG.info(
+            'log.' + record.levelname.lower(),
+            message=record.msg,
+            logger=record.name
+        )
+
+
+def get_log_destination() -> Path:
+    # If
+    # if inside job? Local JOBFS?
+    if 'PBS_JOBFS' in os.environ:
+        # If stageout defined, use it.
+        # Eg. /jobfs/local/8765259.r-man2
+        return Path(os.environ['PBS_JOBFS']) / 'dea-events.jsonl'
+
+    # directly to lustre? If pbs job
+    # current directory?
+    # stdout? Simple
+
+
+def init_log_storage():
+    # Push std logging through structlog
+    # This will only include whatever log levels have been configured (WARN by default)
+    legacy_log = logging.getLogger()
+    handler = StructLogHandler()
+    handler.setLevel(logging.INFO)
+    legacy_log.addHandler(handler)
+
+    # Output structlog to our work location
     structlog.configure(
         processors=[
             structlog.stdlib.add_log_level,
             structlog.processors.TimeStamper(fmt="ISO"),
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
-            # Coloured output if to terminal.
-            CleanConsoleRenderer() if sys.stdout.isatty() else structlog.processors.JSONRenderer(serializer=_to_json),
+            structlog.processors.JSONRenderer(serializer=_to_json),
         ],
         context_class=dict,
         cache_logger_on_first_use=True,
-        logger_factory=structlog.PrintLoggerFactory(),
+        logger_factory=structlog.PrintLoggerFactory(open('events.jsonl', 'a')),
     )
 
 

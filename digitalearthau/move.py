@@ -34,7 +34,7 @@ _LOG = structlog.get_logger()
                 nargs=-1)
 @ui.pass_index('move')
 def main(index, dry_run, paths, destination, checksum):
-    uiutil.init_logging()
+    uiutil.init_log_storage()
     collections.init_nci_collections(None)
 
     if not path_utils.is_base_directory(destination):

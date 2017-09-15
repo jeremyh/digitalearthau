@@ -39,7 +39,7 @@ def main():
 @ui.pass_index()
 @ui.parsed_search_expressions
 def indexed(index, expressions, dry_run, only_redundant, min_trash_age_hours):
-    uiutil.init_logging()
+    uiutil.init_log_storage()
 
     _LOG.info('query', query=expressions)
     datasets = index.datasets.search(**expressions)

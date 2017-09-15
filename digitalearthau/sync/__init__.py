@@ -71,7 +71,7 @@ def cli(index: Index,
         min_trash_age_hours: bool,
         jobs: int,
         **fix_settings):
-    uiutil.init_logging()
+    uiutil.init_log_storage()
 
     if fix_settings['index_missing'] and fix_settings['trash_missing']:
         click.echo('Can either index missing datasets (--index-missing) , or trash them (--trash-missing), '
