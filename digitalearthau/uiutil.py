@@ -21,30 +21,37 @@ class CleanConsoleRenderer(structlog.dev.ConsoleRenderer):
 
 class StructLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord):
+        msg = record.msg
+        if record.args is not None:
+            msg = record.msg % record.args
+
         _LOG.info(
             'log.' + record.levelname.lower(),
-            message=record.msg,
+            message=msg,
             logger=record.name
         )
 
 
 def get_log_destination() -> Path:
-    # If
+    # Simplest option: stdout for structured.
     # if inside job? Local JOBFS?
+
+    # In job, override all logging?
     if 'PBS_JOBFS' in os.environ:
         # If stageout defined, use it.
         # Eg. /jobfs/local/8765259.r-man2
         return Path(os.environ['PBS_JOBFS']) / 'dea-events.jsonl'
 
-    # directly to lustre? If pbs job
-    # current directory?
-    # stdout? Simple
+        # directly to lustre? If pbs job
+        # current directory?
+        # stdout? Simple
 
 
 def init_log_storage():
     # Push std logging through structlog
     # This will only include whatever log levels have been configured (WARN by default)
     legacy_log = logging.getLogger()
+    legacy_log.setLevel(logging.INFO)
     handler = StructLogHandler()
     handler.setLevel(logging.INFO)
     legacy_log.addHandler(handler)
@@ -78,6 +85,7 @@ def _to_json(o, *args, **kwargs):
     >>> _to_json(uuid.UUID('b6bf8ff5-99e6-4562-87b4-cbe6549335e9'))
     '"b6bf8ff5-99e6-4562-87b4-cbe6549335e9"'
     """
+
     return json.dumps(
         o,
         default=_json_fallback,
