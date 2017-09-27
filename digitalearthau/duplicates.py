@@ -146,16 +146,13 @@ collections.init_nci_collections(None)
 
 @click.command('duplicates')
 @global_cli_options
-@click.option('-a', '--all_', is_flag=True)
+@click.option('-a', '--all', 'all_', is_flag=True)
 @click.argument('collections_', type=click.Choice(collections.registered_collection_names()), nargs=-1)
 @pass_index(app_name="find-duplicates")
 def cli(index, all_, collections_):
     collections.init_nci_collections(index)
 
-    if all_:
-        collection_names = collections.registered_collection_names()
-    else:
-        collection_names = collections_
+    collection_names = collections.registered_collection_names() if all_ else collections_
 
     write_duplicates_csv(
         index,

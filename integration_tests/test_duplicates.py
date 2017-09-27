@@ -61,6 +61,10 @@ def test_no_duplicates(global_integration_cli_args,
     assert res.exit_code == 0
     assert res.output == 'product,time_lower_day,lat,lon,count,dataset_refs\n'
 
+    res = _run_cmd(['--all'], global_integration_cli_args)
+    assert res.exit_code == 0
+    assert res.output == 'product,time_lower_day,lat,lon,count,dataset_refs\n'
+
     # Error returned, fake product
     res = _run_cmd(['ls8_fake_product'], global_integration_cli_args)
     assert 'Usage:' in res.output
@@ -73,6 +77,10 @@ def test_duplicates(global_integration_cli_args,
     res = _run_cmd(['ls8_level1_scene', 'ls7_level1_scene'], global_integration_cli_args)
     assert res.output == _EXPECTED_SPECIFIC_DUPS
     assert res.exit_code == 0
+
+    res = _run_cmd(['--all'], global_integration_cli_args)
+    assert res.exit_code == 0
+    assert res.output == 'product,time_lower_day,lat,lon,count,dataset_refs\n'
 
 
 def _run_cmd(args, global_integration_cli_args) -> click.testing.Result:
