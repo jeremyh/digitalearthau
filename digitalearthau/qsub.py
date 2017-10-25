@@ -95,7 +95,33 @@ class QSubLauncher(object):
         Throws JobSubmissionError on failure.
         """
         qsub_args, script = self.build_submission(*commands)
+        return self._do_submit(qsub_args, script)
 
+    def submit_self(self) -> str:
+        """
+        Qsub the currently-running script with '--qsub' and '--qsub-size' arguments removed
+        Throws JobSubmissionError on failure.
+        """
+        qsub_args, script = self.build_self_submission()
+        return self._do_submit(qsub_args, script)
+
+    def build_submission(self, *commands: str) -> Tuple[List[str], str]:
+        """Get the qsub arguments and script that would be submitted, but don't submit it."""
+        if self._internal_args is not None:
+            commands = tuple(self._internal_args) + commands
+
+        script = _generate_self_launch_script(*commands)
+        qsub_args = _build_qsub_args(**self._raw_qsub_params)
+        return qsub_args, script
+
+    def build_self_submission(self) -> Tuple[List[str], str]:
+        """Get the qsub commands and script needed to resubmit the current script without qsub arguments"""
+        args = sys.argv[1:]
+        args = remove_args('--qsub', args, n=1)
+        args = remove_args('--queue-size', args, n=1)
+        return self.build_submission(*args)
+
+    def _do_submit(self, qsub_args, script) -> str:
         proc = Popen(['qsub'] + qsub_args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         proc.stdin.write(script.encode('utf-8'))
         proc.stdin.close()
@@ -108,15 +134,6 @@ class QSubLauncher(object):
 
         job_id = stdout.strip(' \n')
         return job_id
-
-    def build_submission(self, *commands: str) -> Tuple[List[str], str]:
-        """Get the qsub arguments and script that would be submitted, but don't submit it."""
-        if self._internal_args is not None:
-            commands = tuple(self._internal_args) + commands
-
-        script = _generate_self_launch_script(*commands)
-        qsub_args = _build_qsub_args(**self._raw_qsub_params)
-        return qsub_args, script
 
 
 class JobSubmissionError(Exception):

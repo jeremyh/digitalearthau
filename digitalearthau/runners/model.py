@@ -39,8 +39,6 @@ class TaskAppState(NamedTuple):
     # Path where tasks are stored, once calculated
     task_serialisation_path: Path
 
-    pbs_parameters: PbsParameters = None
-
 
 class DefaultJobParameters(NamedTuple):
     """
@@ -49,11 +47,11 @@ class DefaultJobParameters(NamedTuple):
     These will often be stored or shown as a way to distinguish the task.
     """
     # Datacube query args used to select datasets to process (eg time=(1994, 1995), product=ls5_nbar_albers)
-    query: dict
+    query: dict = None
 
     # Input and output product names ("ls7_nbar_albers")
-    source_products: List[str]
-    output_products: List[str]
+    source_products: List[str] = None
+    output_products: List[str] = None
 
 
 class TaskDescription(NamedTuple):
@@ -76,13 +74,13 @@ class TaskDescription(NamedTuple):
     logs_path: Path
 
     # Parameters that are unique to this job, such as the datacube query used to find datasets.
-    # (Expect this type to be a union or eventually: other apps may have different parameters?
-    #  but we'd prefer to keep them standardised if possible..)
-    parameters: DefaultJobParameters
+    parameters: dict
 
     # Parameters specific to the task runtime (eg. datacube task_app).
-    # (Expect this type to be a union eventually: other runtime types might be added in the future...)
-    runtime_state: TaskAppState = None
+    runtime_state: dict = None
 
     # Folder containing records of submitted jobs.
     jobs_path: Path = None
+
+    # PBS parameters to use, if this is a pbs job
+    pbs_parameters: PbsParameters = None

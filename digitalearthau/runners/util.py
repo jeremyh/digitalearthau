@@ -34,9 +34,10 @@ def init_task_app(
     Creates a work directory and sets up the common folder structure.
     """
     task_datetime = datetime.utcnow().replace(tzinfo=tz.tzutc())
+    output_product = output_products[0]
     work_path = paths.get_product_work_directory(
         # First is the primary...
-        output_product=output_products[0],
+        output_product=output_product,
         time=task_datetime
     )
     _LOG.info("Created work directory %s", work_path)
@@ -47,20 +48,62 @@ def init_task_app(
         events_path=work_path.joinpath('events'),
         logs_path=work_path.joinpath('logs'),
         jobs_path=work_path.joinpath('jobs'),
-        parameters=DefaultJobParameters(
+        parameters=dict(
             query=datacube_query_args,
             source_products=source_products,
             output_products=output_products,
         ),
         # Task-app framework
-        runtime_state=TaskAppState(
+        runtime_state=dict(
             config_path=app_config_path,
-            task_serialisation_path=work_path.joinpath('generated-tasks.pickle'),
-            pbs_parameters=PbsParameters(
-                project=pbs_project,
-                queue=pbs_queue,
-            )
+            task_serialisation_path=work_path.joinpath('generated-tasks.pickle')
         ),
+        pbs_parameters=PbsParameters(
+            project=pbs_project,
+            queue=pbs_queue,
+        ),
+    )
+    task_desc.logs_path.mkdir(parents=True, exist_ok=False)
+    task_desc.events_path.mkdir(parents=True, exist_ok=False)
+    task_desc.jobs_path.mkdir(parents=True, exist_ok=False)
+
+    task_desc_path = work_path.joinpath('task-description.json')
+    serialise.dump_structure(task_desc_path, task_desc)
+    return task_desc, task_desc_path
+
+
+def load_task_app_desc(task_desc_path: Path) -> TaskDescription:
+    return serialise.load_structure(task_desc_path, TaskDescription)
+
+
+def init_task(
+        job_type: str,
+        product: str,
+        job_parameters: dict,
+        runtime_state: dict = None,
+        pbs_parameters: PbsParameters = None) -> Tuple[TaskDescription, Path]:
+    """
+    Convenience function for creating and writing a task description
+    for a general process running against a product.
+
+    Creates a work directory and sets up the common folder structure.
+    """
+    task_datetime = datetime.utcnow().replace(tzinfo=tz.tzutc())
+    work_path = paths.get_product_work_directory(
+        output_product=product,
+        time=task_datetime
+    )
+    _LOG.info("Created work directory %s", work_path)
+
+    task_desc = TaskDescription(
+        type_=job_type,
+        task_dt=task_datetime,
+        events_path=work_path.joinpath('events'),
+        logs_path=work_path.joinpath('logs'),
+        jobs_path=work_path.joinpath('jobs'),
+        parameters=job_parameters,
+        runtime_state=runtime_state,
+        pbs_parameters=pbs_parameters,
     )
     task_desc.logs_path.mkdir(parents=True, exist_ok=False)
     task_desc.events_path.mkdir(parents=True, exist_ok=False)
@@ -75,7 +118,7 @@ def submit_subjob(
         name: str,
         task_desc: TaskDescription,
         command: List[str],
-        qsub_params) -> str:
+        qsub_params: dict) -> str:
     """
     Convenience method for submitting a sub job under the given task_desc
 
@@ -95,7 +138,7 @@ def submit_subjob(
     qsub = QSubLauncher(
         norm_qsub_params(
             dict(
-                **task_desc.runtime_state.pbs_parameters._asdict(),
+                **task_desc.pbs_parameters._asdict(),
                 **qsub_params,
                 noask=True,
                 stdout=stdout_path,
