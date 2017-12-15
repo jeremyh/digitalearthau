@@ -13,8 +13,11 @@ from functools import partial
 from pathlib import Path
 
 import click
+import logging
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
+import requests
 import sqlalchemy
 from babel import Locale, numbers
 
@@ -22,6 +25,7 @@ WORK_DIR = Path('/g/data/v10/work/')
 
 LOCALE, ENCODING = locale.getlocale()
 LOCALE_OBJ = Locale(LOCALE or "en_AU")
+LOG = logging.getLogger(__name__)
 
 as_percent = partial(numbers.format_percent,
                      locale=LOCALE_OBJ)
@@ -35,18 +39,58 @@ def as_currency(num):
                                    locale=LOCALE_OBJ) if not math.isnan(num) else 'NaN'
 
 
+def df_to_es(df, es_host):
+    # df is a dataframe or dataframe chunk coming from your reading logic
+    df['_id'] = df['column_1'] + '_' + df['column_2']  # or whatever makes your _id
+    df_as_json = df.to_json(orient='records', lines=True)
+
+    final_json_string = ''
+    for json_document in df_as_json.split('\n'):
+        jdict = json.loads(json_document)
+        metadata = json.dumps({'index': {'_id': jdict['_id']}})
+        jdict.pop('_id')
+        final_json_string += metadata + '\n' + json.dumps(jdict) + '\n'
+
+    headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+    r = requests.post('http://elasticsearch.host:9200/my_index/my_type/_bulk', data=final_json_string, headers=headers,
+                      timeout=60)
+
+
+class DFBackedTaskStore:
+    def __init__(self, filename):
+        self.df = pd.DataFrame()
+        pass
+
+
+class SQLBackedTaskStore:
+    pass
+
+
+class ESBackedTaskStore:
+    pass
+
+
+def process_task(task_id):
+    if db.task_may_need_update(task_id):
+        if db.task_not_complete(task_id):
+            task_info = find_task_info()
+
+
 @click.command(help=__doc__)
 @click.option('--glob', required=True, help="For example: 'ls?_fc*/create/*/*'. Be careful of shell escaping.")
-@click.option('--html-file', required=True, type=click.Path(dir_okay=False, writable=True))
+@click.option('--html-file', type=click.Path(dir_okay=False, writable=True))
 @click.option('--work-dir', default=WORK_DIR)
 @click.option('--pickle-file', type=click.Path(dir_okay=False, writable=True))
-@click.option('--sqlite-file', type=click.Path(dir_okay=False))
-def main(glob, html_file, work_dir, pickle_file, sqlite_file):
+@click.option('--database', type=(str, str), help='Save results to an SQL database table. Specify '
+                                                  'an sqlalchemy connection string and a table name. '
+                                                  'eg. --database sqlite:///file.sqlite stacking_progress')
+def main(glob, html_file, work_dir, pickle_file, database):
+    logging.basicConfig(level=logging.DEBUG)
     fc_dirs = work_dir.glob(glob)
 
-    fc_create_tasks = [find_task_info(name) for name in fc_dirs]
+    tasks = [find_task_info(name) for name in tqdm(list(fc_dirs))]
 
-    df = pd.DataFrame(fc_create_tasks)
+    df = pd.DataFrame(tasks)
     df = df.set_index('tag')
     df = df.sort_index(ascending=False)
 
@@ -70,16 +114,16 @@ def main(glob, html_file, work_dir, pickle_file, sqlite_file):
     if pickle_file:
         df.to_pickle(pickle_file)
 
-    if sqlite_file:
-        engine = sqlalchemy.create_engine('sqlite:///' + sqlite_file)
-        df.to_sql('stacking_progress', engine, if_exists='replace')
+    if database:
+        conn_str, table = database
+        engine = sqlalchemy.create_engine(conn_str)
+        df.to_sql(table, engine, if_exists='replace')
 
-    # Select and order columns
-    # Available columns
-    # cputime exit_status  generate_is_queued   memused  ncpus  num_completed  num_tasks  output_product
-    # run_completed  run_queued  run_running  service_units time_finish # ed walltime  year  cpu_efficiency  percent_complete
-    # tag
+    if html_file:
+        save_to_html(df, html_file)
 
+
+def save_to_html(df, html_file):
     df = df['year output_product run_queued run_running run_completed num_tasks num_completed '
             'percent_complete run_service_units run_cpu_efficiency run_cost'.split()]
     formatters = {'cost': as_currency,
@@ -87,7 +131,6 @@ def main(glob, html_file, work_dir, pickle_file, sqlite_file):
                   'cpu_efficiency': as_percent}
     # Output!
     Path(html_file).write_text(df.to_html(formatters=formatters), encoding='utf8')
-
     #    pd.set_option('display.max_colwidth', 250)
     pd.set_option('display.max_columns', 500)
     pd.set_option('display.width', 1000)
@@ -95,6 +138,7 @@ def main(glob, html_file, work_dir, pickle_file, sqlite_file):
 
 
 def find_task_info(task_dir):
+    LOG.info('Processing task dir: %s', task_dir)
     task_info = {'tag': str(task_dir)[-17:]}
 
     os.chdir(task_dir)
@@ -169,7 +213,11 @@ def parse_outfile(path):
 
 
 def find_in_file(regexp, paths):
-    return execute_command(['sed', '-rn', fr's/.*{regexp}.*/\1/p'] + [str(p) for p in paths])
+    paths = list(paths)
+    if paths:
+        return execute_command(['sed', '-rn', fr's/.*{regexp}.*/\1/p'] + [str(p) for p in paths])
+    else:
+        raise ValueError('No paths to search')
 
 
 def count_in_file(regexp, paths):
