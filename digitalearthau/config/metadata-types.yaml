@@ -13,18 +13,16 @@ dataset:
         platform:
             description: Platform code
             offset: [platform, code]
+            indexed: false
 
         instrument:
             description: Instrument name
             offset: [instrument, name]
+            indexed: false
 
         product_type:
             description: Product code
             offset: [product_type]
-
-        format:
-            description: File format (GeoTiff, NetCDF)
-            offset: [format, name]
             indexed: false
 
         lat:
@@ -62,6 +60,80 @@ dataset:
             - [extent, from_dt]
             max_offset:
             - [extent, to_dt]
+
+---
+name: tile
+description: Tile produced by datacube ingester
+dataset:
+    id: ['id']
+    creation_dt: ['creation_dt']
+    label: ['label']
+    measurements: ['image', 'bands']
+    grid_spatial: ['grid_spatial', 'projection']
+    format: ['format', 'name']
+    sources: ['lineage', 'source_datasets']
+
+    search_fields:
+        platform:
+            description: Platform code
+            offset: [platform, code]
+            indexed: false
+
+        instrument:
+            description: Instrument name
+            offset: [instrument, name]
+            indexed: false
+
+        product_type:
+            description: Product code
+            offset: [product_type]
+            indexed: false
+
+        lat:
+            description: Latitude range
+            type: double-range
+            max_offset:
+            - [extent, coord, ur, lat]
+            - [extent, coord, lr, lat]
+            - [extent, coord, ul, lat]
+            - [extent, coord, ll, lat]
+            min_offset:
+            - [extent, coord, ur, lat]
+            - [extent, coord, lr, lat]
+            - [extent, coord, ul, lat]
+            - [extent, coord, ll, lat]
+
+        lon:
+            description: Longitude range
+            type: double-range
+            max_offset:
+            - [extent, coord, ul, lon]
+            - [extent, coord, ur, lon]
+            - [extent, coord, ll, lon]
+            - [extent, coord, lr, lon]
+            min_offset:
+            - [extent, coord, ul, lon]
+            - [extent, coord, ur, lon]
+            - [extent, coord, ll, lon]
+            - [extent, coord, lr, lon]
+
+        time:
+            description: Acquisition time
+            type: datetime-range
+            min_offset:
+            - [extent, from_dt]
+            max_offset:
+            - [extent, to_dt]
+
+        crs:
+            description: "Coordinate reference system (eg: 'epsg:3577')"
+            offset: ['grid_spatial', 'projection', 'spatial_reference']
+            indexed: false
+
+        footprint_geojson:
+            description: GeoJSON dict of valid data footprint
+            offset: ['grid_spatial', 'projection', 'valid_data']
+            indexed: false
 
 ---
 
@@ -190,6 +262,11 @@ dataset:
             offset: [acquisition, platform_orbit]
             indexed: false
 
+        size_bytes:
+            description: Size of package in bytes
+            offset: [size_bytes]
+            indexed: false
+
         sat_path:
             description: Landsat path
             type: numeric-range
@@ -294,6 +371,11 @@ dataset:
         ancillary_quality:
             description: Ancillary quality
             offset: [lineage, ancillary_quality]
+            indexed: false
+
+        size_bytes:
+            description: Size of package in bytes
+            offset: [size_bytes]
             indexed: false
 
         gqa:

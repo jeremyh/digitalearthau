@@ -7,6 +7,7 @@ from typing import Iterable
 
 import pytest
 
+import datacube
 import digitalearthau
 import digitalearthau.system
 from datacube.config import LocalConfig
@@ -28,7 +29,12 @@ except ImportError:
 INTEGRATION_DEFAULT_CONFIG_PATH = Path(__file__).parent.joinpath('testing-default.conf')
 
 
-@pytest.fixture
+def pytest_report_header(config):
+    if config.getoption('verbose') > 0:
+        return f"digitaleathau {digitalearthau.__version__}, opendatacube {datacube.__version__}"
+
+
+@pytest.fixture(scope='session')
 def integration_config_paths():
     if not INTEGRATION_DEFAULT_CONFIG_PATH.exists():
         # Safety check. We never want it falling back to the default config,
@@ -50,7 +56,7 @@ def global_integration_cli_args(integration_config_paths: Iterable[str]):
     return list(itertools.chain(*(('--config_file', f) for f in integration_config_paths)))
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def local_config(integration_config_paths):
     return LocalConfig.find(integration_config_paths)
 
