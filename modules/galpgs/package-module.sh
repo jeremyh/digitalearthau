@@ -10,14 +10,14 @@ echo
 echo "module_dir = ${module_dir:=/g/data/v10/private/modules}"
 echo "agdc_module_dir = ${agdc_module_dir:=/g/data/v10/public/modules}"
 echo
-echo "agdc_instance_module = ${agdc_instance_module:=agdc-py3-prod/1.3.2}"
+echo "agdc_instance_module = ${agdc_instance_module:=agdc-py3-prod/1.4.1}"
 agdc_instance_module_name=${agdc_instance_module%/*}
 instance=${agdc_instance_module_name##*-}
 echo "instance = ${instance}"
 echo
-echo "eodatasets_head = ${eodatasets_head:=develop}"
-echo "gqa_head = ${gqa_head:=develop}"
-echo "gaip_head = ${gaip_head:=develop}"
+echo "eodatasets_head = ${eodatasets_head:=eodatasets1}"
+echo "gqa_head = ${gqa_head:=19f83b9}"
+echo "gaip_head = ${gaip_head:=05a3c7b}"
 echo
 echo "##########################"
 export module_dir agdc_instance_module
@@ -59,12 +59,13 @@ function installrepo() {
 
     build_dest="build/${destination_name}"
     [ -e "${build_dest}" ] && rm -rf "${build_dest}"
-    git clone -b "${head}" "${repo_cache}" "${build_dest}"
+    git clone "${repo_cache}" "${build_dest}"
 
     pushd "${build_dest}"
+        git checkout "$head"
         rm -r dist build > /dev/null 2>&1 || true
         python setup.py sdist
-        pip install dist/*.tar.gz "--prefix=${package_dest}"
+        pip install dist/*.tar.gz "--prefix=${package_dest}" 
     popd
 }
 
@@ -73,6 +74,7 @@ package_description="GA lpgs processing"
 package_dest=${module_dir}/${package_name}/${version}
 python_dest=${package_dest}/lib/python${python_version}/site-packages
 export package_name package_description package_dest python_dest
+export TMPDIR=/g/data/v10/agdc/jez/digitalearthau/modules/galpgs/tmp
 
 printf '# Packaging "%s %s" to "%s" #\n' "$package_name" "$version" "$package_dest"
 
@@ -85,13 +87,15 @@ then
     # The destination needs to be on the path so that latter dependencies can see earlier ones
     export PYTHONPATH=${PYTHONPATH:+${PYTHONPATH}:}${python_dest}
 
+    pip install 'python-dateutil>=2.6.1' "--prefix=${package_dest}" "--ignore-installed" 'luigi>=2.7.3' 'cligj>=0.5'
+
     echo
     echo "Installing dependencies"
     installrepo idlfunctions develop              git@github.com:sixy6e/idl-functions.git
     installrepo eotools      develop              git@github.com:GeoscienceAustralia/eo-tools.git
     installrepo eodatasets   "${eodatasets_head}" git@github.com:GeoscienceAustralia/eo-datasets.git
     installrepo gaip         "${gaip_head}"       git@github.com:GeoscienceAustralia/gaip.git
-    installrepo gqa          "${gqa_head}"        git@github.com:GeoscienceAustralia/gqa.git
+    installrepo gqa          "${gqa_head}"        git@github.com:jeremyh/gqa.git
 
     echo
     echo "Installing galpgs"
